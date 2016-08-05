@@ -21,12 +21,23 @@ headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/44.0.2403.89 Chrome/44.0.2403.89 Safari/537.36'}
 ]
 
-
+def beautiful_content(means, tag):
+    result = ''
+    for mean in means.descendants:
+        if hasattr(mean, 'text'):
+            result = result + mean.text
+            if (mean.name == tag):
+                result = result + '\n'
+            else:
+                result = result + '   '
+    return result
+            
 def do_request(word):
     global Import_path, headers
 
     url = word_url % word
-    source_code = requests.get(url, headers=random.choice(headers))
+    source_code = requests.get(url, headers=random.choice(headers), timeout = 15)
+
     # just get the code, no headers or anything
     plain_text = source_code.text
     # BeautifulSoup objects can be sorted through easy
@@ -73,8 +84,17 @@ def do_request(word):
     f = open(word_mean, 'w', encoding='utf-8')
     means = soup.find("div", class_="qdef")
     for mean in means.find_all('li'):
-        f.write(mean.text)
+        f.write(mean.text + "\n")
     f.close()
+
+    #单词的补充
+    addition_path = wordinfo_path + "\\addition.txt"
+    addition_mean = means.find(class_='hd_if')
+    if addition_mean != None:
+        f = open(addition_path, 'w', encoding='utf-8')
+        f.write(beautiful_content(addition_mean, 'a'))
+        f.close()
+    
     
     #搭配，同义，反义,权威英汉双解，英汉，英英的获取
     tagmap = {}
@@ -104,17 +124,18 @@ def do_request(word):
             continue
             
         f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w', encoding = 'utf-8')
-        for mean in means.find_all(id=key):
-            print("mean")
-            sentence= mean.find(class_='li_sen')
-            if (sentence != None):
-                f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w', encoding = 'utf-8')
-                f2.write(sentence.text)
-                for no_lis in mean.find_all(class_='se_lis'):
-                    f.write(no_lis.text)
-                f2.close()
-            else:
-                f.write(mean.text)
+        mean = means.find(id=key)
+        sentence= mean.find(class_='li_sen')
+        #权威英汉双解，英汉，英英
+        if (sentence != None):
+            f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w', encoding = 'utf-8')
+            f2.write(sentence.text)
+            for no_lis in mean.find_all(class_='se_lis'):
+                f.write(no_lis.text)
+            f2.close()
+        #搭配，同义，反义
+        else:
+            f.write(mean.text)
         f.close()
         
     #获取例句及读音
@@ -140,17 +161,18 @@ def do_request(word):
 
 
 if __name__ == "__main__":
-    if os.path.exists(Import_path):
-        print("Please delete import folder.")
-        #return 0
-        #print("Please delete %s folder." % Import_path)
-        
     if not os.path.exists(words_path):
-	    print("Please give your wordlist in folder.")
-        #print("Please give your wordlist in folder: %s." % words_path)
-        
-    os.mkdir(Import_path)
-        
+        tips = "Please give your wordlist in folder: %s." % words_path
+        print(tips)
+
+    existsWords = set()
+    if os.path.exists(Import_path):
+        for filename in os.listdir(Import_path):
+            if(os.path.isdir(Import_path + '\\' + filename)):
+                existsWords.add(filename)
+    else:
+        os.mkdir(Import_path)    
+
     for filename in os.listdir(words_path):
         if(os.path.isdir(words_path + '\\' + filename)):
             continue;
@@ -163,9 +185,18 @@ if __name__ == "__main__":
         f.close()
         
         #去除重复单词
-        words = list(set(words))
+        words = list(set(words) - existsWords)
         
         for word in words:
-            if word != None:
+            try:
                 do_request(word)
+            except requests.exceptions.ConnectionError as e:                
+                tips = "Can't get Word--%s, exception happened." % word        
+                print(tips)
+                print(e)
+
+                wordinfo_path = Import_path + '\\' + word
+                if os.path.exists(wordinfo_path):
+                    import shutil
+                    shutil.rmtree(wordinfo_path)
     
