@@ -94,7 +94,16 @@ def do_request(word):
         f = open(addition_path, 'w', encoding='utf-8')
         f.write(beautiful_content(addition_mean, 'a'))
         f.close()
-    
+
+    #单词的图片获取
+    pictures = means.find(class_='img_area')
+    if pictures != None:
+        pos = 1
+        for picture in pictures.find_all('img'):
+            piclink = picture.get('src')
+            pic_path = '%s\\pic%d.jpg' %(wordinfo_path, pos)
+            urllib.request.urlretrieve(piclink, pic_path)
+            pos = pos + 1    
     
     #搭配，同义，反义,权威英汉双解，英汉，英英的获取
     tagmap = {}
