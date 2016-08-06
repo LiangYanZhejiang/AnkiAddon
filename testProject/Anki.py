@@ -8,9 +8,10 @@ import sys
 import os
 import urllib
 
-words_path = os.getcwd() + "\\Words"
-Import_path = os.getcwd() + "\\Import_path"
-word_url = "http://cn.bing.com/dict/search?q=%s"
+words_path = os.getcwd() + '\\Words'
+Import_path = os.getcwd() + '\\Import_path'
+word_url = 'http://cn.bing.com/dict/search?q=%s'
+sentance_url = 'http://dict.youdao.com/example/mdia/audio/%s'
 
 headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:34.0) Gecko/20100101 Firefox/34.0'},
@@ -61,7 +62,7 @@ def beautiful_content(means, tag):
     return result
             
 def do_request(word):
-    global Import_path, headers
+    global Import_path, sentance_url, word_url, headers
 
     url = word_url % word
     source_code = requests.get(url, headers=random.choice(headers), timeout = 15)
@@ -176,21 +177,54 @@ def do_request(word):
         f.close()
         
     #获取例句及读音
-    #其他语音的获取
-    senDefLink = soup.find("div", class_="senDefLink")
-    if senDefLink == None:
-        return    
-    for aTag in senDefLink.find_all('a'):
-        aTagid = aTag.get('id')
-        if aTagid == 'sde_all':
-            sentence_path = wordinfo_path + '\\all'
-            do_savesentence(sentence_path, soup)
-        else:
-            aTagh = aTag.get('h')
-            text = do_post(url, aTagh[3:])
-            other_soup = BeautifulSoup(text, "html.parser")
-            sentence_path = wordinfo_path + '\\' + aTagid[4:]
-            do_savesentence(sentence_path, other_soup)
+#    senDefLink = soup.find("div", class_="senDefLink")
+#    if senDefLink == None:
+#        return    
+#    for aTag in senDefLink.find_all('a'):
+#        aTagid = aTag.get('id')
+#        if aTagid == 'sde_all':
+#            sentence_path = wordinfo_path + '\\all'
+#            do_savesentence(sentence_path, soup)
+#        else:
+#            aTagh = aTag.get('h')
+#            try:
+#                text = do_post(url, aTagh[3:])
+#            except socket.timeout as e:
+#                tips = "Exception happened:can't get Word--%s all sentances mp3 files." % word        
+#                print(tips)
+#                print(e)
+#                continue
+#            
+#            other_soup = BeautifulSoup(text, "html.parser")
+#            sentence_path = wordinfo_path + '\\' + aTagid[4:]
+#            do_savesentence(sentence_path, other_soup)
+
+    #原音获取
+    sentence_url = sentance_url % word
+    sentence_code = requests.get(sentence_url, headers=random.choice(headers), timeout = 15)
+    # just get the code, no headers or anything
+    sentence_text = sentence_code.text
+    # BeautifulSoup objects can be sorted through easy
+    sentence_soup = BeautifulSoup(sentence_text, "html.parser")
+    sentences = sentence_soup.find("ul", class_="ol")
+    sentence_path = wordinfo_path + '\\VOA_special'
+    os.mkdir(sentence_path)
+    
+    sentenceNo = 1
+    for sentence in sentences.find_all('p'):
+        if sentenceNo > 10:
+            break
+        aTag = sentence.find('a')
+        if aTag == None:
+            continue
+        file_path = '%s\\%d.txt' %(sentence_path , sentenceNo)
+        f = open(file_path, 'w', encoding = 'utf-8')
+        f.write(sentence.text)
+        mp3link = aTag.get('data-rel')
+        if mp3link != None:            
+            mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo)
+            urllib.request.urlretrieve(mp3link, mp3_path)            
+        sentenceNo = sentenceNo + 1    
 
 
 if __name__ == "__main__":
@@ -228,6 +262,7 @@ if __name__ == "__main__":
                 print(tips)
                 print(e)
 
+                #删除此次的文件，便于下次下载
                 wordinfo_path = Import_path + '\\' + word
                 if os.path.exists(wordinfo_path):
                     import shutil
