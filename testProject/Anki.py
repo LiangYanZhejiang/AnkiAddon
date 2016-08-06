@@ -168,19 +168,23 @@ def do_request(word):
         #权威英汉双解，英汉，英英
         if (sentences != None):
             f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w', encoding = 'utf-8')
-            for seg in sentences.find_all(class_='de_seg'):
-                for sentence in seg.contents:
-                    if 'dis' in sentence.get('class'):
-                        f2.write('%s\n' % sentence.text)
-                        f.write('%s\n' % sentence.text)
-                    elif 'se_lis' in sentence.get('class'):
-                        detail = sentence.contents[0].contents[0]
-                        str = '%s\t%s\n' %(detail.contents[0].text, detail.contents[1].text)
-                        f2.write(str)
-                        f.write(str)
-                    else:
-                        for detail in sentence.find_all(class_='li_ex'):
-                            f2.write('%s\n%s\n' %(detail.contents[0].text,detail.contents[1].text))
+            for table in sentences.find_all('table'):
+                nolis = False
+                if 'se_lis' in table.parent.get('class'):
+                    nolis = True
+                sib = table.parent.previous_sibling
+                if sib != None and 'dis' in sib.get('class'):
+                    f.write('%s\n' % sib.text)
+                    f2.write('%s\n' % sib.text)
+                    
+                for tr in table.contents:                    
+                    for td in tr.contents:
+                        f2.write('%s\t' % td.text)
+                        if nolis: f.write('%s\t' % td.text)
+                    f2.write('\n')
+                    if nolis: f.write('\n')
+                f2.write('\n')
+                if nolis: f.write('\n')
             f2.close()
         #搭配，同义，反义
         else:
@@ -220,7 +224,7 @@ def do_request(word):
     # BeautifulSoup objects can be sorted through easy
     sentence_soup = BeautifulSoup(sentence_text, "html.parser")
     sentences = sentence_soup.find("ul", class_="ol")
-    sentence_path = wordinfo_path + '\\VOA_special'
+    sentence_path = wordinfo_path + '\\Voice'
     os.mkdir(sentence_path)
     
     sentenceNo = 1
