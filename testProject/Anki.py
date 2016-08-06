@@ -11,8 +11,7 @@ import urllib
 words_path = os.getcwd() + '\\Words'
 Import_path = os.getcwd() + '\\Import_path'
 word_url = 'http://cn.bing.com/dict/search?q=%s'
-sentance_url = 'http://dict.youdao.com/example/mdia/audio/%s'
-bbc_url = 'http://dict.youdao.com/example/auth/%s'
+sentance_urls = ['http://dict.youdao.com/example/mdia/audio/%s', 'http://dict.youdao.com/example/auth/%s']
 
 headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:34.0) Gecko/20100101 Firefox/34.0'},
@@ -63,7 +62,7 @@ def beautiful_content(means, tag):
     return result
             
 def do_request(word):
-    global Import_path, sentance_url, word_url, headers
+    global Import_path, sentance_urls, word_url, headers
 
     url = word_url % word
     source_code = requests.get(url, headers=random.choice(headers), timeout = 15)
@@ -191,57 +190,37 @@ def do_request(word):
             for detail in mean.find_all(class_='df_div2'):
                 f.write('%s\t%s\n' %(detail.contents[0].text,detail.contents[1].text))
         f.close()
-'''        
-    #获取例句及读音
-    senDefLink = soup.find("div", class_="senDefLink")
-    if senDefLink == None:
-        return    
-    for aTag in senDefLink.find_all('a'):
-        aTagid = aTag.get('id')
-        if aTagid == 'sde_all':
-            sentence_path = wordinfo_path + '\\all'
-            do_savesentence(sentence_path, soup)
-        else:
-            aTagh = aTag.get('h')
-            try:
-                text = do_post(url, aTagh[3:])
-            except socket.timeout as e:
-                tips = "Exception happened:can't get Word--%s all sentances mp3 files." % word        
-                print(tips)
-                print(e)
-                continue
-            
-            other_soup = BeautifulSoup(text, "html.parser")
-            sentence_path = wordinfo_path + '\\' + aTagid[4:]
-            do_savesentence(sentence_path, other_soup)
-'''
+
 
     #原音获取
-    sentence_url = sentance_url % word
-    sentence_code = requests.get(sentence_url, headers=random.choice(headers), timeout = 15)
-    # just get the code, no headers or anything
-    sentence_text = sentence_code.text
-    # BeautifulSoup objects can be sorted through easy
-    sentence_soup = BeautifulSoup(sentence_text, "html.parser")
-    sentences = sentence_soup.find("ul", class_="ol")
+    authNo = 0
     sentence_path = wordinfo_path + '\\Voice'
-    os.mkdir(sentence_path)
-    
-    sentenceNo = 1
-    for sentence in sentences.find_all('p'):
-        if sentenceNo > 10:
-            break
-        aTag = sentence.find('a')
-        if aTag == None:
-            continue
-        file_path = '%s\\%d.txt' %(sentence_path , sentenceNo)
-        f = open(file_path, 'w', encoding = 'utf-8')
-        f.write(sentence.text)
-        mp3link = aTag.get('data-rel')
-        if mp3link != None:            
-            mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo)
-            urllib.request.urlretrieve(mp3link, mp3_path)            
-        sentenceNo = sentenceNo + 1    
+    os.mkdir(sentence_path)    
+    for li_url in sentance_urls:
+        sentence_url =  li_url % word
+        sentence_code = requests.get(sentence_url, headers=random.choice(headers), timeout = 15)
+        # just get the code, no headers or anything
+        sentence_text = sentence_code.text
+        # BeautifulSoup objects can be sorted through easy
+        sentence_soup = BeautifulSoup(sentence_text, "html.parser")
+        sentences = sentence_soup.find("ul", class_="ol")
+                
+        sentenceNo = 1
+        for sentence in sentences.find_all('p'):
+            if sentenceNo > 10:
+                break
+            aTag = sentence.find('a')
+            if aTag == None:
+                continue
+            file_path = '%s\\%d.txt' %(sentence_path , sentenceNo + authNo)
+            f = open(file_path, 'w', encoding = 'utf-8')
+            f.write(sentence.text)
+            mp3link = aTag.get('data-rel')
+            if mp3link != None:            
+                mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo + authNo)
+                urllib.request.urlretrieve(mp3link, mp3_path)            
+            sentenceNo = sentenceNo + 1
+        authNo = 10
 
 if __name__ == "__main__":
     if not os.path.exists(words_path):
