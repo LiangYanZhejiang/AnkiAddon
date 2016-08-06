@@ -21,6 +21,34 @@ headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/44.0.2403.89 Chrome/44.0.2403.89 Safari/537.36'}
 ]
 
+def do_savesentence(sentence_path, soup):
+    #获取例句及读音
+    os.mkdir(sentence_path)
+    sentenceSeg = soup.find("div", id="sentenceSeg")
+    sentenceNo = 1
+    for sentence in sentenceSeg.find_all(class_ = 'se_li'):
+        file_path = '%s\\%d.txt' %(sentence_path , sentenceNo)
+        f = open(file_path, 'w', encoding = 'utf-8')
+        f.write(sentence.text)
+        voice = sentence.find(class_='bigaud')
+        if voice != None:
+            mousedown = voice.get('onmousedown')                
+            i = mousedown.find("http")
+            j = mousedown.find("mp3")
+            if i != -1 and j != -1:                
+                mp3link = mousedown[i:j+3]
+                mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo)
+                urllib.request.urlretrieve(mp3link, mp3_path)            
+        sentenceNo = sentenceNo + 1
+
+def do_post(url, dicid):
+    global headers
+    dic = {'ID':dicid}
+    dic_urlencode = urllib.parse.urlencode(dic)
+    req = urllib.request.Request(url = url,data =dic_urlencode.encode(encoding='utf-8',errors='ignore'), headers = random.choice(headers), method='POST')
+    response = urllib.request.urlopen(req, timeout=15)
+    return response.read().decode('utf-8')
+
 def beautiful_content(means, tag):
     result = ''
     for mean in means.descendants:
@@ -148,25 +176,21 @@ def do_request(word):
         f.close()
         
     #获取例句及读音
-    sentence_path = wordinfo_path + '\\例句'
-    os.mkdir(sentence_path)
-    sentenceSeg = soup.find("div", id="sentenceSeg")
-    sentenceNo = 1
-    for sentence in sentenceSeg.find_all(class_ = 'se_li'):
-        file_path = '%s\\%d.txt' %(sentence_path , sentenceNo)
-        f = open(file_path, 'w', encoding = 'utf-8')
-        f.write(sentence.text)
-        voice = sentence.find(class_='bigaud')
-        if voice != None:
-            mousedown = voice.get('onmousedown')                
-            i = mousedown.find("http")
-            j = mousedown.find("mp3")
-            if i != -1 and j != -1:                
-                mp3link = mousedown[i:j+3]
-                mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo)
-                urllib.request.urlretrieve(mp3link, mp3_path)            
-        sentenceNo = sentenceNo + 1
-        
+    #其他语音的获取
+    senDefLink = soup.find("div", class_="senDefLink")
+    if senDefLink == None:
+        return    
+    for aTag in senDefLink.find_all('a'):
+        aTagid = aTag.get('id')
+        if aTagid == 'sde_all':
+            sentence_path = wordinfo_path + '\\all'
+            do_savesentence(sentence_path, soup)
+        else:
+            aTagh = aTag.get('h')
+            text = do_post(url, aTagh[3:])
+            other_soup = BeautifulSoup(text, "html.parser")
+            sentence_path = wordinfo_path + '\\' + aTagid[4:]
+            do_savesentence(sentence_path, other_soup)
 
 
 if __name__ == "__main__":
