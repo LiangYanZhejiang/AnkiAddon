@@ -7,6 +7,7 @@ import random
 import sys
 import os
 import urllib
+import socket
 
 words_path = os.getcwd() + '\\Words'
 Import_path = os.getcwd() + '\\Import_path'
@@ -60,6 +61,26 @@ def beautiful_content(means, tag):
             else:
                 result = result + '   '
     return result
+
+def get_map(means):
+    tagmap = {}
+    for mean in means.find_all(class_='tb_div'):
+        for atag in mean.find_all('a'):
+            if atag.text == None:
+                continue            
+            str = atag.get('onmousedown')
+            if str == None:
+                continue
+            strlist = str.split(r"', '")
+            str = strlist[0]
+            x = str.find(r"('")
+            y = str.find(r"')")
+            if y == -1:
+                str = str[x+2:]
+            else:
+                str = str[x+2:y]                
+            tagmap[str+'id']=atag.text
+    return tagmap
             
 def do_request(word):
     global Import_path, sentance_urls, word_url, headers
@@ -134,63 +155,76 @@ def do_request(word):
             urllib.request.urlretrieve(piclink, pic_path)
             pos = pos + 1    
     
-    #搭配，同义，反义,权威英汉双解，英汉，英英的获取
-    tagmap = {}
-    for mean in means.find_all(class_='tb_div'):
-        for atag in mean.find_all('a'):
-            if atag.text == None:
-                continue            
-            str = atag.get('onmousedown')
-            if str == None:
-                continue
-            strlist = str.split(r"', '")
-            str = strlist[0]
-            x = str.find(r"('")
-            y = str.find(r"')")
-            if y == -1:
-                str = str[x+2:]
-            else:
-                str = str[x+2:y]                
-            tagmap[str+'id']=atag.text
-    
-    #f获取的是释义
-    #f2仅获取的是释义+例句
+    #搭配，同义，反义的获取
+    mean = means.find(class_='wd_div')
+    tagmap = get_map(mean)
+
+    tagmap_keys=list(tagmap.keys())
+    for key in tagmap_keys:
+        f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w', encoding = 'utf-8')
+        mean = means.find(id=key)
+        for detail in mean.find_all(class_='df_div2'):
+                f.write('%s\t%s\n' %(detail.contents[0].text,detail.contents[1].text))
+        f.close()
+        
+    #权威英汉双解，英汉，英英的获取
+    mean = means.find(class_='df_div')
+    tagmap = get_map(mean)
+
     tagmap_keys=list(tagmap.keys())
     for key in tagmap_keys:
         #网络的忽略之
         if key=='webid':
             continue
-            
+
+        #f获取的是释义
+        #f2仅获取的是释义+例句
         f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w', encoding = 'utf-8')
         mean = means.find(id=key)
-        sentences= mean.find(class_='li_sen')
-        #权威英汉双解，英汉，英英
-        if (sentences != None):
+
+        haslis = False
+        if mean.find(class_ = 'se_lis') != None:
+            haslis = True
             f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w', encoding = 'utf-8')
-            for table in sentences.find_all('table'):
-                nolis = False
-                if 'se_lis' in table.parent.get('class'):
-                    nolis = True
-                sib = table.parent.previous_sibling
-                if sib != None and 'dis' in sib.get('class'):
-                    f.write('%s\n' % sib.text)
-                    f2.write('%s\n' % sib.text)
+
+        segs = mean.find_all(class_='each_seg')
+        if len(segs) == 0 : segs.append(mean)
+
+        for seg in segs:
+            pos = seg.find(class_='pos')
+            if pos != None :
+                f.write('%s\n' % pos.text)
+                if haslis: f2.write('%s\n' % pos.text)
+                        
+            for table in seg.find_all('table'):
+                lisFlag = False
+                if haslis:
+                    if 'li_exs' in table.parent.get('class'):
+                        lisFlag = True
+                        
+                    sib = table.parent.previous_sibling
+                    if sib != None and 'dis' in sib.get('class'):
+                        f.write('%s\n' % sib.text)
+                        f2.write('%s\n' % sib.text)
+
+                fwrite = (not haslis) or (haslis and not lisFlag)
                     
                 for tr in table.contents:                    
                     for td in tr.contents:
-                        f2.write('%s\t' % td.text)
-                        if nolis: f.write('%s\t' % td.text)
-                    f2.write('\n')
-                    if nolis: f.write('\n')
-                f2.write('\n')
-                if nolis: f.write('\n')
-            f2.close()
-        #搭配，同义，反义
-        else:
-            for detail in mean.find_all(class_='df_div2'):
-                f.write('%s\t%s\n' %(detail.contents[0].text,detail.contents[1].text))
+                        if hasattr(td.contents[0].contents[0], 'contents'):
+                            for div in td.contents[0].contents:                    
+                                if haslis: f2.write('%s' % div.text)
+                                if fwrite: f.write('%s' % div.text)
+                        else:
+                            if haslis: f2.write('%s\t' % td.text)
+                            if fwrite: f.write('%s\t' % td.text)
+                    if haslis: f2.write('\n')
+                    if fwrite: f.write('\n')
+                if haslis: f2.write('\n')
+                if fwrite: f.write('\n')
+                
+        if haslis: f2.close()
         f.close()
-
 
     #原音获取
     authNo = 0
@@ -208,6 +242,7 @@ def do_request(word):
         sentenceNo = 1
         for sentence in sentences.find_all('p'):
             if sentenceNo > 10:
+                authNo = 10
                 break
             aTag = sentence.find('a')
             if aTag == None:
@@ -218,9 +253,13 @@ def do_request(word):
             mp3link = aTag.get('data-rel')
             if mp3link != None:            
                 mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo + authNo)
-                urllib.request.urlretrieve(mp3link, mp3_path)            
+                try:
+                    urllib.request.urlretrieve(mp3link, mp3_path)
+                except socket.timeout:
+                    tips = 'Socket timeout, can\'t download %s.' % mp3link
+                    print(tips)
             sentenceNo = sentenceNo + 1
-        authNo = 10
+
 
 if __name__ == "__main__":
     if not os.path.exists(words_path):
@@ -233,7 +272,9 @@ if __name__ == "__main__":
             if(os.path.isdir(Import_path + '\\' + filename)):
                 existsWords.add(filename)
     else:
-        os.mkdir(Import_path)    
+        os.mkdir(Import_path)
+
+    socket.setdefaulttimeout(30)
 
     for filename in os.listdir(words_path):
         if(os.path.isdir(words_path + '\\' + filename)):
