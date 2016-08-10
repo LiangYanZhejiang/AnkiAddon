@@ -12,7 +12,7 @@ import socket
 words_path = os.getcwd() + '\\Words'
 Import_path = os.getcwd() + '\\Import_path'
 word_url = 'http://cn.bing.com/dict/search?q=%s'
-sentance_urls = ['http://dict.youdao.com/example/mdia/audio/%s', 'http://dict.youdao.com/example/auth/%s']
+sentence_urls = ['http://dict.youdao.com/example/mdia/audio/%s', 'http://dict.youdao.com/example/auth/%s']
 
 headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:34.0) Gecko/20100101 Firefox/34.0'},
@@ -63,6 +63,8 @@ def beautiful_content(means, tag):
     return result
 
 def get_map(means):
+    if means == None:
+       return
     tagmap = {}
     for mean in means.find_all(class_='tb_div'):
         for atag in mean.find_all('a'):
@@ -90,6 +92,7 @@ def do_request(word):
 
     # just get the code, no headers or anything
     plain_text = source_code.text
+
     # BeautifulSoup objects can be sorted through easy
     soup = BeautifulSoup(plain_text, "html.parser")
     wordinfo_path = Import_path + '\\' + word
@@ -159,7 +162,11 @@ def do_request(word):
     mean = means.find(class_='wd_div')
     tagmap = get_map(mean)
 
-    tagmap_keys=list(tagmap.keys())
+    if tagmap == None:
+        tagmap_keys = []
+    else:
+        tagmap_keys=list(tagmap.keys())
+        
     for key in tagmap_keys:
         f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w', encoding = 'utf-8')
         mean = means.find(id=key)
@@ -171,7 +178,11 @@ def do_request(word):
     mean = means.find(class_='df_div')
     tagmap = get_map(mean)
 
-    tagmap_keys=list(tagmap.keys())
+    if tagmap == None:
+        tagmap_keys = []
+    else:
+        tagmap_keys=list(tagmap.keys())
+        
     for key in tagmap_keys:
         #网络的忽略之
         if key=='webid':
@@ -226,39 +237,50 @@ def do_request(word):
         if haslis: f2.close()
         f.close()
 
-    #原音获取
-    authNo = 0
+    #原音获取    
     sentence_path = wordinfo_path + '\\Voice'
-    os.mkdir(sentence_path)    
-    for li_url in sentance_urls:
-        sentence_url =  li_url % word
+    os.mkdir(sentence_path)
+
+    totalNo = 1
+    for lis_url in sentence_urls:
+        sentence_url =  lis_url % word
         sentence_code = requests.get(sentence_url, headers=random.choice(headers), timeout = 15)
         # just get the code, no headers or anything
         sentence_text = sentence_code.text
+
         # BeautifulSoup objects can be sorted through easy
         sentence_soup = BeautifulSoup(sentence_text, "html.parser")
         sentences = sentence_soup.find("ul", class_="ol")
                 
-        sentenceNo = 1
-        for sentence in sentences.find_all('p'):
-            if sentenceNo > 10:
-                authNo = 10
+        sentenceNo = 1        
+        for sentence in sentences.find_all('li'):
+            if sentenceNo > 5:
                 break
-            aTag = sentence.find('a')
-            if aTag == None:
-                continue
-            file_path = '%s\\%d.txt' %(sentence_path , sentenceNo + authNo)
+        
+            content = sentence.find('p')
+            file_path = '%s\\%d.txt' %(sentence_path , totalNo)
             f = open(file_path, 'w', encoding = 'utf-8')
-            f.write(sentence.text)
-            mp3link = aTag.get('data-rel')
+            f.write(content.text)
+            f.close()
+            
+            aTag = sentence.find_all('a')
+            if aTag == None:
+                continue        
+
+            if len(aTag) == 2 :
+                mp3link = aTag[1].get('href')
+            else:
+                mp3link = aTag[0].get('data-rel')
             if mp3link != None:            
-                mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo + authNo)
+                mp3_path = '%s\\%d.mp3' %(sentence_path , totalNo)
                 try:
                     urllib.request.urlretrieve(mp3link, mp3_path)
-                except socket.timeout:
-                    tips = 'Socket timeout, can\'t download %s.' % mp3link
+                except Exception as ex:
+                    tips = 'Exception happened, can\'t download mp3:(%s).\nException:%s' % (content.text,ex)
                     print(tips)
+                    
             sentenceNo = sentenceNo + 1
+            totalNo = totalNo + 1
 
 
 if __name__ == "__main__":
@@ -299,8 +321,10 @@ if __name__ == "__main__":
                 print(e)
 
                 #删除此次的文件，便于下次下载
+                '''
                 wordinfo_path = Import_path + '\\' + word
                 if os.path.exists(wordinfo_path):
                     import shutil
                     shutil.rmtree(wordinfo_path)
+                '''
     
