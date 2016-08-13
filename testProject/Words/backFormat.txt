@@ -1,0 +1,5 @@
+﻿%(英汉)
+%(pr_US)
+%(Picture_3)
+%(Voice_pr_50)
+%(Word)

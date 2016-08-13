@@ -1,0 +1,4 @@
+﻿%(mean)
+%(pr_En)
+%(Picture_3)
+%(Voice_lis_3)
