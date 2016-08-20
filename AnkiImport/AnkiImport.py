@@ -81,9 +81,8 @@ VOICE_MAX = 10
 
 def writeLog(content):
     logContent = '%s  %s\n' %(datetime.utcnow().strftime(LOGTIME_FORMAT), content)
-    log_utf8 = logContent.decode('gbk')
     f = codecs.open(LOG_FILE, 'a', encoding='utf-8')
-    f.write(log_utf8)
+    f.write(logContent)
     f.close()
 
 def doMediaImport():
@@ -111,6 +110,7 @@ def doMediaImport():
     #Import Words
     ImportWords = []
     for word in words:
+        word = unicode(word, 'utf-8')
         if doCheckWordInfo(word):
             ImportWords.append(word)
             
@@ -127,7 +127,6 @@ def doMediaImport():
     newCount = 0
     failure = False
     for i, word in enumerate(ImportWords): 
-        word = unicode(word, 'utf-8')
         note = notes.Note(mw.col, m)
         note.model()['did'] = did
         wordInfo = getWordInfo(word)
@@ -198,7 +197,7 @@ def doCheckWordInfo(word):
     existsFiles = set()
     if os.path.exists(wordPath):
         for filename in os.listdir(wordPath):
-            existsFiles.add(filename.decode('gbk'))
+            existsFiles.add(filename)
     
     notExistsFiles = EXISTFILES - existsFiles
     if len(notExistsFiles) == 0:
@@ -339,7 +338,7 @@ class ImportSettingsDialog(QDialog):
     def onBrowse(self):
         """Show the directory selection dialog."""
         path = unicode(
-            QFileDialog.getOpenFileName(mw, "Words list file"))
+            QFileDialog.getOpenFileName(mw, "Words list file",".","Text File(*.txt)"))
 
         self.WordlistFile = path
         self.form.WordlistFile.setText(self.WordlistFile)
@@ -349,31 +348,33 @@ class ImportSettingsDialog(QDialog):
         # Show a red warning box if the user tries to import without selecting
         # a directory.
         if not self.WordlistFile:
-            self.WordlistFile.setStyleSheet("border: 1px solid red")
+            self.form.WordlistFile.setStyleSheet("border: 1px solid red")
             return
         self.DecksName = self.form.DecksName.text()
         self.FrontEdit = self.form.FrontEdit.toPlainText()
         self.BackEdit = self.form.BackEdit.toPlainText()
+
+        self.form.DecksName.setStyleSheet("")
+        self.form.FrontEdit.setStyleSheet("")
+        self.form.BackEdit.setStyleSheet("")
         if self.DecksName == '':
-            self.DecksName.setStyleSheet("border: 1px solid red")
+            self.form.DecksName.setStyleSheet("border: 1px solid red")
             return
         if self.FrontEdit == '':
-            self.FrontEdit.setStyleSheet("border: 1px solid red")
+            self.form.FrontEdit.setStyleSheet("border: 1px solid red")
+            return
+        if not doCheckFormat(self.FrontEdit):
+            self.form.FrontEdit.setStyleSheet("border: 1px solid red")
+            showErrorDialog("Front format is wrong.")
             return
         if self.BackEdit == '':
-            self.BackEdit.setStyleSheet("border: 1px solid red")
+            self.form.BackEdit.setStyleSheet("border: 1px solid red")
+            return
+        if not doCheckFormat(self.BackEdit):
+            self.form.BackEdit.setStyleSheet("border: 1px solid red")
+            showErrorDialog("Back format is wrong.")
             return
         QDialog.accept(self)
-
-    def clearLayout(self, layout):
-        """Convenience method to remove child widgets from a layout."""
-        while layout.count():
-            child = layout.takeAt(0)
-            if child.widget() is not None:
-                child.widget().deleteLater()
-            elif child.layout() is not None:
-                self.clearLayout(child.layout())
-
 
 def showCompletionDialog(newCount):
     QMessageBox.about(mw, "Media Import Complete",
@@ -396,6 +397,9 @@ note type you selected is able to generate cards by using a valid
 <a href="http://ankisrs.net/docs/manual.html#cards-and-templates">card template</a>.
 </p>
 """)
+
+def showErrorDialog(reason):
+    QMessageBox.about(mw, "Error",reason)
 
 action = QAction("Media Import...", mw)
 mw.connect(action, SIGNAL("triggered()"), doMediaImport)

@@ -41,7 +41,7 @@ class Ui_Form(object):
         self.label_3.setObjectName("label_3")
         self.horizontalLayout_5.addWidget(self.label_3)
         self.WordlistFile = QtGui.QLineEdit(Form)
-        self.WordlistFile.setEnabled(True)
+        self.WordlistFile.setEnabled(False)
         self.WordlistFile.setObjectName("WordlistFile")
         self.horizontalLayout_5.addWidget(self.WordlistFile)
         self.browse = QtGui.QPushButton(Form)
