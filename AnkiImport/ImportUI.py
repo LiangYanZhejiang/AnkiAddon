@@ -29,7 +29,7 @@ class Ui_Form(object):
         self.horizontalLayout_6.addWidget(self.label_4)
         self.ImportDir = QtGui.QLineEdit(Form)
         self.ImportDir.setEnabled(False)
-        self.ImportDir.setMouseTracking(True)
+        #self.ImportDir.setMouseTracking(True)
         self.ImportDir.setObjectName("ImportDir")
         self.horizontalLayout_6.addWidget(self.ImportDir)
         spacerItem = QtGui.QSpacerItem(75, 20, QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Minimum)
@@ -87,7 +87,7 @@ class Ui_Form(object):
         QtCore.QMetaObject.connectSlotsByName(Form)
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(_translate("Form", "Media Import",None))
+        Form.setWindowTitle(_translate("Form", "Words Import",None))
         self.label_4.setText(_translate("Form", "Import directory:",None))
         self.label_3.setText(_translate("Form", " Words List Path:",None))
         self.browse.setText(_translate("Form", "Browse",None))
