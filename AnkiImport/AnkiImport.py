@@ -74,6 +74,7 @@ VOICE_PATTERN = u'Voice_pr_(\\d*)'
 PIC_PATTERN = u'Picture_(\\d*)'
 PATTERN_STR_S = '%%(%s)'
 PATTERN_STR_D = '%%(%s)s'
+WORD_PATTERN = u'^[a-z|A-Z]*[a-z|A-Z|\s]*$'
 
 PATTERN_LIST = [LIS_PATTERN, VOICE_PATTERN, PIC_PATTERN]
 
@@ -84,6 +85,21 @@ def writeLog(content):
     f = codecs.open(LOG_FILE, 'a', encoding='utf-8')
     f.write(logContent)
     f.close()
+
+def getWordList(filePath):
+    f = open(filePath, 'r')
+    #将单词字母小写
+    words = []
+    for word in f.readlines():
+        word = word.strip('\n').strip(' ').lower()
+        if word == '':
+            continue
+        l = re.findall(WORD_PATTERN, word)
+        if len(l) != 0:
+            words.append(word)
+    f.close()
+    words = list(set(words))
+    return words
 
 def doMediaImport():
     reload(sys)
@@ -98,14 +114,7 @@ def doMediaImport():
     if not (doCheckFormat(frontFormat) and doCheckFormat(backFormat)):
         return
     
-    f = open(wordListFile,'r')
-    #将单词字母小写
-    words = []
-    for word in f.readlines():
-        words.append(word.strip('\n').lower())       
-    f.close()
-    #获取已有单词（未做），去除重复单词    
-    words = list(set(words))
+    words = getWordList(wordListFile)
         
     #Import Words
     ImportWords = []
@@ -357,6 +366,12 @@ class ImportSettingsDialog(QDialog):
         self.form.DecksName.setStyleSheet("")
         self.form.FrontEdit.setStyleSheet("")
         self.form.BackEdit.setStyleSheet("")
+
+        words = getWordList(self.WordlistFile)
+        if len(words) == 0:
+            self.form.WordlistFile.setStyleSheet("border: 1px solid red")
+            showErrorDialog("Can't get words from file:%s." % self.WordlistFile)
+            return
         if self.DecksName == '':
             self.form.DecksName.setStyleSheet("border: 1px solid red")
             return
