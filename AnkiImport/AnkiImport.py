@@ -101,7 +101,7 @@ def getWordList(filePath):
     words = list(set(words))
     return words
 
-def doMediaImport():
+def doAnkiImport():
     reload(sys)
     sys.setdefaultencoding("utf-8")
 
@@ -416,7 +416,7 @@ note type you selected is able to generate cards by using a valid
 def showErrorDialog(reason):
     QMessageBox.about(mw, "Error",reason)
 
-action = QAction("Media Import...", mw)
-mw.connect(action, SIGNAL("triggered()"), doMediaImport)
+action = QAction("Words Import...", mw)
+mw.connect(action, SIGNAL("triggered()"), doAnkiImport)
 mw.form.menuTools.addAction(action)
 
