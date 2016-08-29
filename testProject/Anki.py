@@ -1,6 +1,7 @@
 ﻿#!/usr/bin/env python
 # encoding: utf-8
 import time
+import datetime
 import requests
 from bs4 import BeautifulSoup
 import random
@@ -8,11 +9,17 @@ import sys
 import os
 import urllib
 import socket
+import logging
 
 words_path = os.getcwd() + '\\Words'
 Import_path = os.getcwd() + '\\Import_path'
 word_url = 'http://cn.bing.com/dict/search?q=%s'
 sentence_urls = ['http://dict.youdao.com/example/mdia/audio/%s', 'http://dict.youdao.com/example/auth/%s']
+
+LOG_FOLDER = os.getcwd() + '\\logs'
+LOG_FILE = LOG_FOLDER + '\\log_%s.txt'
+TIMEFORMAT='%Y-%m-%d'
+LOGTIME_FORMAT='%Y-%m-%d %H:%M:%S:%f'
 
 headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:34.0) Gecko/20100101 Firefox/34.0'},
@@ -40,15 +47,15 @@ def do_savesentence(sentence_path, soup):
             if i != -1 and j != -1:                
                 mp3link = mousedown[i:j+3]
                 mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo)
-                urllib.request.urlretrieve(mp3link, mp3_path)            
+                urllib.urlretrieve(mp3link, mp3_path)
         sentenceNo = sentenceNo + 1
 
 def do_post(url, dicid):
     global headers
     dic = {'ID':dicid}
     dic_urlencode = urllib.parse.urlencode(dic)
-    req = urllib.request.Request(url = url,data =dic_urlencode.encode(encoding='utf-8',errors='ignore'), headers = random.choice(headers), method='POST')
-    response = urllib.request.urlopen(req, timeout=15)
+    req = urllib.Request(url = url,data =dic_urlencode.encode(encoding='utf-8',errors='ignore'), headers = random.choice(headers), method='POST')
+    response = urllib.urlopen(req, timeout=15)
     return response.read().decode('utf-8')
 
 def beautiful_content(means, tag):
@@ -88,7 +95,7 @@ def do_request(word):
     global Import_path, sentance_urls, word_url, headers
 
     url = word_url % word
-    source_code = requests.get(url, headers=random.choice(headers), timeout = 15)
+    source_code = requests.get(url, headers=random.choice(headers))
 
     # just get the code, no headers or anything
     plain_text = source_code.text
@@ -97,21 +104,25 @@ def do_request(word):
     soup = BeautifulSoup(plain_text, "html.parser")
     wordinfo_path = Import_path + '\\' + word
 
-    print(wordinfo_path)
+    log = 'Download word path %s' % wordinfo_path
+    logging.debug(log)
     if os.path.exists(wordinfo_path):        
         return
         
     os.mkdir(wordinfo_path)
     
     #音标获取
-    f = open(wordinfo_path + '\\' + 'pr_US.txt', 'w', encoding='utf-8')
     us_pr = soup.find('div', class_='hd_prUS')
-    f.write(us_pr.text)
-    f.close()
-    f = open(wordinfo_path + '\\' + 'pr_En.txt', 'w', encoding='utf-8')
+    if us_pr != None:
+        f = open(wordinfo_path + u'\\pr_US.txt', 'w')
+        f.write(us_pr.text)
+        f.close()
+
     usa_pr = soup.find('div', class_='hd_pr')
-    f.write(usa_pr.text)
-    f.close()
+    if us_pr != None:
+        f = open(wordinfo_path + u'\\pr_En.txt', 'w')
+        f.write(usa_pr.text)
+        f.close()
 
     #音标的读音获取
     mp3_us = True
@@ -124,27 +135,27 @@ def do_request(word):
         if i == -1 or j == -1:
             continue
         mp3link = mouseover[i:j+3]
-        if (mp3_us):
+        if (mp3_us and us_pr != None):
             mp3_path = wordinfo_path + '\\us.mp3'
         else:
             mp3_path = wordinfo_path + '\\en.mp3'
         
-        urllib.request.urlretrieve(mp3link, mp3_path)
+        urllib.urlretrieve(mp3link, mp3_path)
         mp3_us = False
         
     #单词意思获取
-    word_mean = wordinfo_path + '\\mean.txt'
-    f = open(word_mean, 'w', encoding='utf-8')
+    word_mean = wordinfo_path + u'\\mean.txt'
+    f = open(word_mean, 'w')
     means = soup.find('div', class_='qdef')
     for mean in means.find_all('li'):
         f.write('%s\t%s\n' %(mean.contents[0].text,mean.contents[1].text))
     f.close()
 
     #单词的补充
-    addition_path = wordinfo_path + '\\addition.txt'
+    addition_path = wordinfo_path + u'\\addition.txt'
     addition_mean = means.find(class_='hd_if')
     if addition_mean != None:
-        f = open(addition_path, 'w', encoding='utf-8')
+        f = open(addition_path, 'w')
         f.write(beautiful_content(addition_mean, 'a'))
         f.close()
 
@@ -155,7 +166,7 @@ def do_request(word):
         for picture in pictures.find_all('img'):
             piclink = picture.get('src')
             pic_path = '%s\\pic%d.jpg' %(wordinfo_path, pos)
-            urllib.request.urlretrieve(piclink, pic_path)
+            urllib.urlretrieve(piclink, pic_path)
             pos = pos + 1    
     
     #搭配，同义，反义的获取
@@ -168,7 +179,7 @@ def do_request(word):
         tagmap_keys=list(tagmap.keys())
         
     for key in tagmap_keys:
-        f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w', encoding = 'utf-8')
+        f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w')
         mean = means.find(id=key)
         for detail in mean.find_all(class_='df_div2'):
                 f.write('%s\t%s\n' %(detail.contents[0].text,detail.contents[1].text))
@@ -190,13 +201,13 @@ def do_request(word):
 
         #f获取的是释义
         #f2仅获取的是释义+例句
-        f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w', encoding = 'utf-8')
+        f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w')
         mean = means.find(id=key)
 
         haslis = False
         if mean.find(class_ = 'se_lis') != None:
             haslis = True
-            f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w', encoding = 'utf-8')
+            f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w')
 
         segs = mean.find_all(class_='each_seg')
         if len(segs) == 0 : segs.append(mean)
@@ -252,14 +263,17 @@ def do_request(word):
         sentence_soup = BeautifulSoup(sentence_text, "html.parser")
         sentences = sentence_soup.find("ul", class_="ol")
                 
-        sentenceNo = 1        
+        if sentences == None:
+            return
+
+        sentenceNo = 1
         for sentence in sentences.find_all('li'):
             if sentenceNo > 5:
                 break
         
             content = sentence.find('p')
             file_path = '%s\\%d.txt' %(sentence_path , totalNo)
-            f = open(file_path, 'w', encoding = 'utf-8')
+            f = open(file_path, 'w')
             f.write(content.text)
             f.close()
             
@@ -274,16 +288,20 @@ def do_request(word):
             if mp3link != None:            
                 mp3_path = '%s\\%d.mp3' %(sentence_path , totalNo)
                 try:
-                    urllib.request.urlretrieve(mp3link, mp3_path)
+                    opener = urllib.FancyURLopener({})
+                    opener.version = random.choice(headers)['User-Agent']
+                    urllib._urlopener = opener
+                    urllib.urlretrieve(mp3link, mp3_path)
+                    log = 'Download %s' % mp3link
+                    logging.debug(log)
                 except Exception as ex:
-                    tips = 'Exception happened, can\'t download mp3:(%s).\nException:%s' % (content.text,ex)
-                    print(tips)
-                    
+                    log = 'Exception happened, can\'t download mp3:(%s)(%s).\nException:%s' % (content.text,mp3link,ex)
+                    logging.error(log)
+
             sentenceNo = sentenceNo + 1
             totalNo = totalNo + 1
 
-
-if __name__ == "__main__":
+def main():
     if not os.path.exists(words_path):
         tips = "Please give your wordlist in folder: %s." % words_path
         print(tips)
@@ -291,40 +309,59 @@ if __name__ == "__main__":
     existsWords = set()
     if os.path.exists(Import_path):
         for filename in os.listdir(Import_path):
-            if(os.path.isdir(Import_path + '\\' + filename)):
+            if (os.path.isdir(Import_path + '\\' + filename)):
                 existsWords.add(filename)
     else:
         os.mkdir(Import_path)
 
-    socket.setdefaulttimeout(30)
+    socket.setdefaulttimeout(5)
 
     for filename in os.listdir(words_path):
-        if(os.path.isdir(words_path + '\\' + filename)):
+        if (os.path.isdir(words_path + '\\' + filename)):
             continue;
-        f = open(words_path + '\\' + filename,'r', encoding='utf-8')
-        
-        #将单词字母小写
+        f = open(words_path + '\\' + filename, 'r')
+
+        # 将单词字母小写
         words = []
         for word in f.readlines():
-            words.append(word.strip('\n').lower())       
+            word = unicode(word, 'utf-8')
+            words.append(word.strip('\n').lower())
         f.close()
-        
-        #去除重复单词
+
+        # 去除重复单词
         words = list(set(words) - existsWords)
-        
+
         for word in words:
             try:
                 do_request(word)
-            except requests.exceptions.ConnectionError as e:                
-                tips = "Can't get Word--%s, exception happened." % word        
+            except requests.exceptions.ConnectionError as e:
+                tips = "Can't get Word--%s, exception happened." % word
                 print(tips)
                 print(e)
 
-                #删除此次的文件，便于下次下载
+                # 删除此次的文件，便于下次下载
                 '''
                 wordinfo_path = Import_path + '\\' + word
                 if os.path.exists(wordinfo_path):
                     import shutil
                     shutil.rmtree(wordinfo_path)
                 '''
-    
+    return
+
+if __name__ == "__main__":
+    reload(sys)
+    sys.setdefaultencoding("utf-8")
+
+    if not os.path.exists(LOG_FOLDER):
+        os.mkdir(LOG_FOLDER)
+
+    log_filename = LOG_FILE % time.strftime('%Y-%m-%d')
+    log_format = '[%(asctime)s] [%(levelname)s] [%(filename)s] [%(module)s] [%(funcName)s] %(message)s'
+    logging.basicConfig(format=log_format,filename=log_filename, filemode='a',level=logging.DEBUG)
+
+    #console = logging.StreamHandler()
+    #console.setLevel(logging.DEBUG)
+    #console.setFormatter(log_format)
+    #logging.getLogger('').addHandler(console)
+
+    main()
