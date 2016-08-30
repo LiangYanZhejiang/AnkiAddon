@@ -290,18 +290,26 @@ def import_words(words):
     # 去除重复单词
     words = list(set(words) - existsWords)
 
+    times = 0
     for word in words:
         try:
             do_request(word)
+            times = 0
         except requests.exceptions.ConnectionError as e:
+            times += 1
             tips = "Can't get Word--%s, exception happened." % word
             logging.exception(tips)
+
+            if times >= 3:
+                print("Please check your internet connection.")
+                break
 
 def main():
     if not os.path.exists(Anki_common.words_path()):
         tips = "Please give your wordlist in folder: %s." % Anki_common.words_path()
         logging.error(tips)
 
+    words = []
     words_path = Anki_common.words_path()
     for filename in os.listdir(words_path):
         if (os.path.isdir(words_path + '\\' + filename)):
@@ -309,7 +317,6 @@ def main():
         f = open(words_path + '\\' + filename, 'r')
 
         # 将单词字母小写
-        words = []
         for word in f.readlines():
             word = unicode(word, 'utf-8')
             words.append(word.strip('\n').lower())
