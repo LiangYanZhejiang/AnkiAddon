@@ -80,12 +80,6 @@ PATTERN_LIST = [LIS_PATTERN, VOICE_PATTERN, PIC_PATTERN]
 
 VOICE_MAX = 10
 
-def writeLog(content):
-    logContent = '%s  %s\n' %(datetime.utcnow().strftime(LOGTIME_FORMAT), content)
-    f = codecs.open(LOG_FILE, 'a', encoding='utf-8')
-    f.write(logContent)
-    f.close()
-
 def getWordList(filePath):
     f = open(filePath, 'r')
     #将单词字母小写

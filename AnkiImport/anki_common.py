@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+# encoding: utf-8
+import time
+import threading
+
+def singleton(cls):
+    instances = {}
+
+    def _singleton(*args, **kw):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kw)
+        return instances[cls]
+    return _singleton
+
+@singleton
+class Anki_common(object):
+    def __init__(self, addon):
+        if addon:
+            from aqt import mw
+            self.root_folder = mw.pm.addonFolder() + '\\AnkiImport'
+        else:
+            import os
+            self.root_folder = os.getcwd()
+
+    def words_path(self):
+        return self.root_folder + '\\Words'
+
+    def import_dir(self):
+        return self.root_folder + '\\Import_path'
+
+    def word_path(self,word):
+        return self.import_dir() + '\\' + word
+
+    def word_url(self, word):
+        return 'http://cn.bing.com/dict/search?q=%s' % word
+
+    def sentence_urls(self):
+        return ['http://dict.youdao.com/example/mdia/audio/%s', 'http://dict.youdao.com/example/auth/%s']
+
+    def log_folder(self):
+        return self.root_folder + '\\logs'
+
+    def log_file(self):
+        str = self.log_folder() + '\\log_%s.txt'
+        return str % time.strftime('%Y-%m-%d')
+
+    def voice_lis_path(self,word):
+        return self.word_path(word) + '\\Voice\\%d.txt'
+
+    def voice_pr_path(self,word):
+        return self.word_path(word) + '\\Voice\\%d.mp3'
+
+    def picture_path(self,word, pos):
+        str = self.word_path(word) + '\\Pic_%d.jpg'
+        return str % pos
+
+    def word_pr_path(self,word):
+        return self.word_path(word) + '\\%s.mp3'
+
+    def word_mean(self,word):
+        return self.word_path(word) + '\\mean.txt'
+
+    def word_addition(self,word):
+        return self.word_path(word) + '\\addition.txt'
+
+    def sentence_folder(self,word):
+        return self.word_path(word) + '\\Voice'
+
+    def clear_linefeeds(self,text):
+        return text.strip().strip('\n').strip('\t')
