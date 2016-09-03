@@ -1,11 +1,11 @@
 ﻿#!/usr/bin/env python
 # encoding: utf-8
-import requests
-from bs4 import BeautifulSoup
+from BeautifulSoup import BeautifulSoup
 import random
 import sys
 import os
 import urllib
+import urllib2
 import logging
 
 from anki_common import Anki_common
@@ -24,11 +24,11 @@ def do_savesentence(sentence_path, soup):
     os.mkdir(sentence_path)
     sentenceSeg = soup.find("div", id="sentenceSeg")
     sentenceNo = 1
-    for sentence in sentenceSeg.find_all(class_ = 'se_li'):
+    for sentence in sentenceSeg.findAll(attrs = {'class' : 'se_li'}):
         file_path = '%s\\%d.txt' %(sentence_path , sentenceNo)
         f = open(file_path, 'w', encoding = 'utf-8')
         f.write(sentence.text)
-        voice = sentence.find(class_='bigaud')
+        voice = sentence.find(attrs={'class':'bigaud'})
         if voice != None:
             mousedown = voice.get('onmousedown')                
             i = mousedown.find("http")
@@ -54,8 +54,8 @@ def get_map(means):
     if means == None:
        return
     tagmap = {}
-    for mean in means.find_all(class_='tb_div'):
-        for atag in mean.find_all('a'):
+    for mean in means.findAll(attrs = {'class':'tb_div'}):
+        for atag in mean.findAll('a'):
             if atag.text == None:
                 continue            
             str = atag.get('onmousedown')
@@ -73,30 +73,28 @@ def get_map(means):
     return tagmap
             
 def do_request(word):
-    source_code = requests.get(Anki_common().word_url(word), headers=random.choice(headers))
+    source_code = urllib2.urlopen(Anki_common().word_url(word))
 
     # just get the code, no headers or anything
-    plain_text = source_code.text
+    plain_text = unicode(source_code.read(), 'utf-8')
 
     # BeautifulSoup objects can be sorted through easy
-    soup = BeautifulSoup(plain_text, "html.parser")
+    soup = BeautifulSoup(plain_text)
     wordinfo_path = Anki_common().word_path(word)
 
     log = 'Download word path %s' % wordinfo_path
     logging.debug(log)
-    if os.path.exists(wordinfo_path):        
-        return
-        
-    os.mkdir(wordinfo_path)
+    if not os.path.exists(wordinfo_path):
+        os.mkdir(wordinfo_path)
     
     #音标获取
-    us_pr = soup.find('div', class_='hd_prUS')
+    us_pr = soup.find('div', 'hd_prUS')
     if us_pr != None:
         f = open(wordinfo_path + u'\\pr_US.txt', 'w')
         f.write(Anki_common().clear_linefeeds(us_pr.text))
         f.close()
 
-    usa_pr = soup.find('div', class_='hd_pr')
+    usa_pr = soup.find('div', 'hd_pr')
     if us_pr != None:
         f = open(wordinfo_path + u'\\pr_En.txt', 'w')
         f.write(Anki_common().clear_linefeeds(usa_pr.text))
@@ -104,7 +102,7 @@ def do_request(word):
 
     #音标的读音获取
     mp3_us = True
-    for pronounce in soup.find_all('a',class_='bigaud'):
+    for pronounce in soup.findAll('a', 'bigaud'):
         mouseover = pronounce.get('onmouseover')
         if mouseover == None:
             continue
@@ -123,28 +121,28 @@ def do_request(word):
         
     #单词意思获取
     f = open(Anki_common().word_mean(word), 'w')
-    means = soup.find('div', class_='qdef')
-    for mean in means.find_all('li'):
+    means = soup.find('div', 'qdef')
+    for mean in means.findAll('li'):
         f.write('%s\t%s\n' %(Anki_common().clear_linefeeds(mean.contents[0].text),
                                Anki_common().clear_linefeeds(mean.contents[1].text)))
     f.close()
 
     #单词的补充
-    addition_mean = means.find(class_='hd_if')
+    addition_mean = means.find(attrs={'class':'hd_if'})
     if addition_mean != None:
         f = open(Anki_common().word_addition(word), 'w')
         f.write(beautiful_content(addition_mean, 'a'))
         f.close()
 
     #单词的图片获取
-    pictures = means.find(class_='img_area')
+    pictures = means.find(attrs={'class':'img_area'})
     if pictures != None:
-        for pos, picture in enumerate(pictures.find_all('img')):
+        for pos, picture in enumerate(pictures.findAll('img')):
             piclink = picture.get('src')
             urllib.urlretrieve(piclink, Anki_common().picture_path(word, pos))
     
     #搭配，同义，反义的获取
-    mean = means.find(class_='wd_div')
+    mean = means.find(attrs={'class':'wd_div'})
     tagmap = get_map(mean)
 
     if tagmap == None:
@@ -155,13 +153,13 @@ def do_request(word):
     for key in tagmap_keys:
         f = open(wordinfo_path + '\\' + tagmap[key] + '.txt', 'w')
         mean = means.find(id=key)
-        for detail in mean.find_all(class_='df_div2'):
+        for detail in mean.findAll(attrs={'class':'df_div2'}):
                 f.write('%s\t%s\n' %(Anki_common().clear_linefeeds(detail.contents[0].text),
                                      Anki_common().clear_linefeeds(detail.contents[1].text)))
         f.close()
         
     #权威英汉双解，英汉，英英的获取
-    mean = means.find(class_='df_div')
+    mean = means.find(attrs={'class':'df_div'})
     tagmap = get_map(mean)
 
     if tagmap == None:
@@ -180,20 +178,20 @@ def do_request(word):
         mean = means.find(id=key)
 
         haslis = False
-        if mean.find(class_ = 'se_lis') != None:
+        if mean.find(attrs={'class':'se_lis'}) != None:
             haslis = True
             f2 = open(wordinfo_path + '\\' + tagmap[key] + '_lis.txt', 'w')
 
-        segs = mean.find_all(class_='each_seg')
+        segs = mean.findAll(attrs={'class':'each_seg'})
         if len(segs) == 0 : segs.append(mean)
 
         for seg in segs:
-            pos = seg.find(class_='pos')
+            pos = seg.find(attrs={'class':'pos'})
             if pos != None :
                 f.write('%s\n' % Anki_common().clear_linefeeds(pos.text))
                 if haslis: f2.write('%s\n' % Anki_common().clear_linefeeds(pos.text))
                         
-            for table in seg.find_all('table'):
+            for table in seg.findAll('table'):
                 lisFlag = False
                 if haslis:
                     if 'li_exs' in table.parent.get('class'):
@@ -225,23 +223,24 @@ def do_request(word):
 
     #原音获取
     sentence_path = Anki_common().sentence_folder(word)
-    os.mkdir(sentence_path)
+    if not os.path.exists(sentence_path):
+        os.mkdir(sentence_path)
 
     totalNo = 1
     for lis_url in Anki_common().sentence_urls():
         sentence_url = lis_url % word
-        sentence_code = requests.get(sentence_url, headers=random.choice(headers), timeout = 15)
+        sentence_code = urllib2.urlopen(sentence_url)
         # just get the code, no headers or anything
-        sentence_text = sentence_code.text
+        sentence_text = sentence_code.read()
 
         # BeautifulSoup objects can be sorted through easy
-        sentence_soup = BeautifulSoup(sentence_text, "html.parser")
-        sentences = sentence_soup.find("ul", class_="ol")
+        sentence_soup = BeautifulSoup(sentence_text)
+        sentences = sentence_soup.find("ul", "ol")
                 
         if sentences == None:
             return
 
-        for sentenceNo, sentence in enumerate(sentences.find_all('li')):
+        for sentenceNo, sentence in enumerate(sentences.findAll('li')):
             if sentenceNo >= 5:
                 break
         
@@ -251,7 +250,7 @@ def do_request(word):
             f.write(Anki_common().clear_linefeeds(content.text))
             f.close()
             
-            aTag = sentence.find_all('a')
+            aTag = sentence.findAll('a')
             if aTag == None:
                 continue        
 

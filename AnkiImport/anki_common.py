@@ -2,6 +2,9 @@
 # encoding: utf-8
 import time
 import threading
+import re
+
+WORD_PATTERN = u'^[a-z|A-Z]*[a-z|A-Z|\s]*$'
 
 def singleton(cls):
     instances = {}
@@ -44,11 +47,13 @@ class Anki_common(object):
         str = self.log_folder() + '\\log_%s.txt'
         return str % time.strftime('%Y-%m-%d')
 
-    def voice_lis_path(self,word):
-        return self.word_path(word) + '\\Voice\\%d.txt'
+    def voice_lis_path(self,word,pos):
+        str = self.word_path(word) + '\\Voice\\%d.txt'
+        return str % pos
 
-    def voice_pr_path(self,word):
-        return self.word_path(word) + '\\Voice\\%d.mp3'
+    def voice_pr_path(self,word,pos):
+        str = self.word_path(word) + '\\Voice\\%d.mp3'
+        return str % pos
 
     def picture_path(self,word, pos):
         str = self.word_path(word) + '\\Pic_%d.jpg'
@@ -68,3 +73,18 @@ class Anki_common(object):
 
     def clear_linefeeds(self,text):
         return text.strip().strip('\n').strip('\t')
+
+    def getWordList(self, filePath):
+        f = open(filePath, 'r')
+        # 将单词字母小写
+        words = []
+        for word in f.readlines():
+            word = word.strip('\n').strip(' ').lower()
+            if word == '':
+                continue
+            l = re.findall(WORD_PATTERN, word)
+            if len(l) != 0:
+                words.append(word)
+        f.close()
+        words = list(set(words))
+        return words

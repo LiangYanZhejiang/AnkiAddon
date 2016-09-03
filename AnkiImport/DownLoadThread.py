@@ -3,7 +3,7 @@
 
 import threading
 import logging
-import requests
+import urllib2
 from WordDownLoad import do_request
 from anki_common import singleton
 
@@ -26,7 +26,7 @@ class downloadThread (threading.Thread):
                     do_request(word)
                     times = 0
                     wordsManager().setWordFinished(self.threadID, word)
-                except requests.exceptions.ConnectionError as e:
+                except urllib2.URLError as e:
                     times += 1
                     tips = "Can't get Word:%s, exception happened." % word
                     logging.exception(tips)
@@ -35,7 +35,7 @@ class downloadThread (threading.Thread):
                         logging.errot("Exceptions happened more than 3 times, please check your connection.")
                         break
 
-            self.wordslist = wordsManager().getWordsForDownload()
+            self.wordslist = wordsManager().getWordsForDownload(self.threadID)
         else:
             tip = "Thread %d is Closed."
             logging.info(tips)
@@ -97,7 +97,7 @@ class wordsManager():
 
     def getFinishedWords(self):
         if len(self.finishedlist) == 0:
-            return None
+            return []
 
         self.mutex.acquire()
         words = self.finishedlist
@@ -108,7 +108,7 @@ class wordsManager():
     def getDownloadList_(self, threadID):
         downloadlist = []
         if threadID in self.downloadMap.keys():
-            downloadlist = downloadMap[threadID]
+            downloadlist = self.downloadMap[threadID]
 
         if downloadlist == None:
             downloadlist = []
@@ -124,10 +124,10 @@ class threadManager():
             self.threads[threadID] = thread
             thread.start()
 
-    def CheckAlive(self):
+    def CheckRunning(self):
         for threadID, thread in self.threads.items():
             if thread != None:
-                if not thread.IsAlive():
+                if not thread.is_alive():
                     wordsManager().RedoWordlist(threadID)
                     del (self.threads[threadID])
             else:
