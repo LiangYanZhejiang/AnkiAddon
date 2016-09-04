@@ -28,11 +28,33 @@ class Anki_common(object):
     def words_path(self):
         return self.root_folder + '\\Words'
 
+    def download_dir(self):
+        return self.root_folder + '\\Download_path'
+
     def import_dir(self):
         return self.root_folder + '\\Import_path'
 
+    def import_deck_dir(self,deck):
+        str = self.root_folder + '\\Import_path\\%s'
+        return str % deck
+
+    def import_fformat_file(self,deck, pos):
+        str = self.import_deck_dir(deck) + '\\frontFormat_%d.txt'
+        return str % pos
+
+    def fformat_pattern(self):
+        return 'frontFormat_(\\d*)\.txt'
+
+    def import_bformat_file(self,deck, pos):
+        str = self.import_deck_dir(deck) + '\\backFormat_%d.txt'
+        return str % pos
+
+    def import_wordslist_file(self,deck, pos):
+        str = self.import_deck_dir(deck) + '\\wordslist_%d.txt'
+        return str % pos
+
     def word_path(self,word):
-        return self.import_dir() + '\\' + word
+        return self.download_dir() + '\\' + word
 
     def word_url(self, word):
         return 'http://cn.bing.com/dict/search?q=%s' % word

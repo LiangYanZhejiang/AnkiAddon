@@ -9,11 +9,13 @@ from anki_common import Anki_common
 from WordDownLoad import do_request
 from DownLoadThread import threadManager
 
+SOCKET_TIMEOUT = 5
+
 def import_words(words):
-    socket.setdefaulttimeout(5)
+    socket.setdefaulttimeout(SOCKET_TIMEOUT)
 
     existsWords = set()
-    Import_path = Anki_common().import_dir()
+    Import_path = Anki_common().download_dir()
     if os.path.exists(Import_path):
         for filename in os.listdir(Import_path):
             if (os.path.isdir(Import_path + '\\' + filename)):

@@ -95,10 +95,10 @@ class wordsManager():
         self.mutex.acquire()
         if threadID not in self.downloadMap.keys():
             logging.debug(("No wordslist for threadID: %d." % threadID))
-            return
-        downloadlist = self.downloadMap.pop(threadID)
-        if downloadlist != None and len(downloadlist) != 0:
-            self.wordslist = list(set(self.wordslist) | set(downloadlist))
+        else:
+            downloadlist = self.downloadMap.pop(threadID)
+            if downloadlist != None and len(downloadlist) != 0:
+                self.wordslist = list(set(self.wordslist) | set(downloadlist))
         self.mutex.release()
 
     def getFinishedWords(self):

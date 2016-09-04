@@ -9,6 +9,8 @@ import urllib2
 import logging
 import socket
 
+LIS_MAX_NUM = 10
+
 from anki_common import Anki_common
 
 headers = [
@@ -25,7 +27,7 @@ def do_savesentence(sentence_path, soup, num):
     sentenceSeg = soup.find("div", id="sentenceSeg")
     sentenceNo = num
     for sentence in sentenceSeg.findAll(attrs = {'class' : 'se_li'}):
-        if sentenceNo > 10:
+        if sentenceNo > LIS_MAX_NUM:
             break;
         text = ''
         en_text = sentence.find('div','sen_en')
@@ -258,7 +260,7 @@ def do_request(word):
             return
 
         for sentenceNo, sentence in enumerate(sentences.findAll('li')):
-            if sentenceNo >= 5:
+            if sentenceNo > LIS_MAX_NUM:
                 break
         
             content = sentence.find('p')
@@ -291,7 +293,7 @@ def do_request(word):
             totalNo = totalNo + 1
 
      # 获取例句及读音
-    if totalNo < 10:
+    if totalNo < LIS_MAX_NUM:
         senDefLink = soup.find('div', 'senDefLink')
         if senDefLink == None:
             return
