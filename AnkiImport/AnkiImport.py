@@ -100,11 +100,13 @@ def doAnkiImport():
     if os.path.exists(Import_path):
         for filename in os.listdir(Import_path):
             if (os.path.isdir(Import_path + '\\' + filename) and filename in words):
-                ImportWords.append(filename)
+                if doCheckWordInfo(filename):
+                    ImportWords.append(filename)
     else:
         os.mkdir(Import_path)
 
     words = list(set(words) - set(ImportWords))
+    logging.debug(("%d words need download, %d words is already download." % (len(words), len(ImportWords))))
     threadManager(words, ImportWords)
 
     (formatMap, realFormatList) = getFormatInfo([Anki_common().clear_linefeeds(frontFormat), Anki_common().clear_linefeeds(backFormat)])
@@ -116,6 +118,7 @@ def doAnkiImport():
         ImportWords = wordsManager().getFinishedWords()
 
         if (not run) and len(ImportWords) == 0:
+            logging.debug("No thread is running and no finished words.")
             break
 
         (failure, newCount) = ImportCards(deckName,ImportWords, formatMap, realFormatList)
@@ -125,6 +128,7 @@ def doAnkiImport():
             isFailure = True
             break
         Count += newCount
+        logging.debug(("This time import %d words." % newCount))
         if newCount == 0:
             time.sleep(60)
 
@@ -202,13 +206,14 @@ def ImportCards(deckName,ImportWords,formatMap,realFormatList):
             break
         newCount += 1
         mw.progress.update(value=i)
+        logging.debug(("Word:%s import as a card %d." % (word,i)))
     mw.progress.finish()
     mw.deckBrowser.refresh()
     return (failure, newCount)
 
 #查询该文件夹是否为有效的单词信息存储文件夹
 def doCheckWordInfo(word):
-    wordPath = WORD_PATH % word
+    wordPath = Anki_common().word_path(word)
     existsFiles = set()
     if os.path.exists(wordPath):
         for filename in os.listdir(wordPath):

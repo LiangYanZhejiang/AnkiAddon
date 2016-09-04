@@ -18,27 +18,29 @@ class downloadThread (threading.Thread):
     def run(self):
         while True:
             if len(self.wordslist) == 0:
+                logging.debug(("Thread %d: No words to download" % self.threadID))
                 break
-
             times = 0
             for word in self.wordslist:
                 try:
                     do_request(word)
                     times = 0
                     wordsManager().setWordFinished(self.threadID, word)
+                    logging.debug(("Thread %d download word:%s is finished" % (self.threadID, word)))
                 except urllib2.URLError as e:
                     times += 1
-                    tips = "Can't get Word:%s, exception happened." % word
-                    logging.exception(tips)
+                    logging.exception(("Thread %d can't get Word:%s, exception happened." % (self.threadID, word)))
 
                     if times >= 3:
                         logging.errot("Exceptions happened more than 3 times, please check your connection.")
                         break
 
             self.wordslist = wordsManager().getWordsForDownload(self.threadID)
+            logging.debug(("Thread %d get wordslist." % self.threadID))
         else:
-            tip = "Thread %d is Closed."
-            logging.info(tips)
+            logging.info(("Thread %d is Closed." % self.threadID ))
+
+        wordsManager().RedoWordlist(self.threadID)
 
 @singleton
 class wordsManager():

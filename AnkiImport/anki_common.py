@@ -38,7 +38,7 @@ class Anki_common(object):
         return 'http://cn.bing.com/dict/search?q=%s' % word
 
     def sentence_urls(self):
-        return ['http://dict.youdao.com/example/mdia/audio/%s', 'http://dict.youdao.com/example/auth/%s']
+        return ['http://dict.youdao.com/example/mdia/audio/%s']#, 'http://dict.youdao.com/example/auth/%s'
 
     def log_folder(self):
         return self.root_folder + '\\logs'
