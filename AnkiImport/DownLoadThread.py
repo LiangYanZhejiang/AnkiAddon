@@ -37,9 +37,8 @@ class downloadThread (threading.Thread):
 
             self.wordslist = wordsManager().getWordsForDownload(self.threadID)
             logging.debug(("Thread %d get wordslist." % self.threadID))
-        else:
-            logging.info(("Thread %d is Closed." % self.threadID ))
 
+        logging.info(("Thread %d is Closed." % self.threadID ))
         wordsManager().RedoWordlist(self.threadID)
 
 @singleton
@@ -52,26 +51,28 @@ class wordsManager():
 
     def getWordsForDownload(self, threadID):
         if len(self.wordslist) == 0:
-            return None
+            return []
 
         wordsNum = self.downLoadNum()
+        logging.debug(("%d words are waiting for download." % wordsNum))
 
-        wordsNum = wordsNum/THREAD_NUM_MAX/2
+        wordsNum = wordsNum/(THREAD_NUM_MAX*2)
         if wordsNum == 0:
             wordsNum = 1
 
         words = []
         self.mutex.acquire()
         downloadlist = self.getDownloadList_(threadID)
-
+        logging.debug(("Thread %d:%d words are not download before get words." % (threadID, wordsNum)))
+        logging.info(("%d words in words list." % len(self.wordslist)))
         if len(self.wordslist) != 0:
             if wordsNum > len(self.wordslist):
                 wordsNum = len(self.wordslist)
-            words = self.wordslist[len(self.wordslist) - wordsNum:len(self.wordslist) - 1]
+            words = self.wordslist[len(self.wordslist) - wordsNum:len(self.wordslist)]
             self.wordslist = list(set(self.wordslist) - set(words))
             self.downloadMap[threadID] = list(set(downloadlist) | set(words))
         self.mutex.release()
-
+        logging.debug(("Thread %d: get %d words from words list." % (threadID, len(words))))
         return words
 
     def setWordFinished(self, threadID, word):
@@ -92,6 +93,9 @@ class wordsManager():
 
     def RedoWordlist(self, threadID):
         self.mutex.acquire()
+        if threadID not in self.downloadMap.keys():
+            logging.debug(("No wordslist for threadID: %d." % threadID))
+            return
         downloadlist = self.downloadMap.pop(threadID)
         if downloadlist != None and len(downloadlist) != 0:
             self.wordslist = list(set(self.wordslist) | set(downloadlist))
@@ -121,7 +125,7 @@ class threadManager():
     def __init__(self, wordslist, finishedlist):
         wordsManager(wordslist, finishedlist)
         self.threads = {}
-        for threadID in range(1, THREAD_NUM_MAX):
+        for threadID in range(1, THREAD_NUM_MAX+1):
             thread = downloadThread(threadID)
             self.threads[threadID] = thread
             thread.start()
