@@ -22,7 +22,7 @@ def import_words(words):
         os.mkdir(Import_path)
 
     # 去除重复单词
-    #words = list(set(words) - existsWords)
+    words = list(set(words) - existsWords)
     threadManager(list(set(words)),list(existsWords))
 
 

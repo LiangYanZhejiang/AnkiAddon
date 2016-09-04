@@ -25,8 +25,6 @@ EXISTFILES = {u'pr_En.txt',
               u'en.mp3',
               u'mean.txt',
               u'addition.txt',
-              u'权威英汉双解.txt',
-              u'英英.txt',
               u'Voice'}
               
 ALLFILES = {u'pr_En.txt',

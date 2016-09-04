@@ -7,6 +7,7 @@ import os
 import urllib
 import urllib2
 import logging
+import socket
 
 from anki_common import Anki_common
 
@@ -19,15 +20,29 @@ headers = [
     {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/44.0.2403.89 Chrome/44.0.2403.89 Safari/537.36'}
 ]
 
-def do_savesentence(sentence_path, soup):
+def do_savesentence(sentence_path, soup, num):
     #获取例句及读音
-    os.mkdir(sentence_path)
     sentenceSeg = soup.find("div", id="sentenceSeg")
-    sentenceNo = 1
+    sentenceNo = num
     for sentence in sentenceSeg.findAll(attrs = {'class' : 'se_li'}):
+        if sentenceNo > 10:
+            break;
+        text = ''
+        en_text = sentence.find('div','sen_en')
+        for word in en_text.findAll(['a','span']):
+            if word.text == '':
+                text += ' '
+            else:
+                text += word.text
+
+        cn_text = sentence.find('div', 'sen_cn')
+        text += cn_text.text
+
         file_path = '%s\\%d.txt' %(sentence_path , sentenceNo)
-        f = open(file_path, 'w', encoding = 'utf-8')
-        f.write(sentence.text)
+        f = open(file_path, 'w')
+        f.write(text)
+        f.close()
+
         voice = sentence.find(attrs={'class':'bigaud'})
         if voice != None:
             mousedown = voice.get('onmousedown')                
@@ -38,6 +53,8 @@ def do_savesentence(sentence_path, soup):
                 mp3_path = '%s\\%d.mp3' %(sentence_path , sentenceNo)
                 urllib.urlretrieve(mp3link, mp3_path)
         sentenceNo = sentenceNo + 1
+
+    return sentenceNo
 
 def beautiful_content(means, tag):
     result = ''
@@ -272,3 +289,13 @@ def do_request(word):
                     logging.error(log)
 
             totalNo = totalNo + 1
+
+     # 获取例句及读音
+    if totalNo < 10:
+        senDefLink = soup.find('div', 'senDefLink')
+        if senDefLink == None:
+            return
+        for aTag in senDefLink.findAll('a'):
+            aTagid = aTag.get('id')
+            if aTagid == 'sde_all':
+                totalNo = do_savesentence(sentence_path, soup,totalNo)
