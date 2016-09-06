@@ -10,6 +10,7 @@ import logging
 from anki_common import Anki_common
 from DownLoadThread import threadManager
 from DownLoadThread import wordsManager
+from anki_common import singleton
 
 import time
 import os
@@ -68,62 +69,232 @@ PATTERN_LIST = [LIS_PATTERN, VOICE_PATTERN, PIC_PATTERN]
 
 VOICE_MAX = 10
 
-def getWordsImported(deck, frontFormat, backFormat):
-    import_folder = Anki_common().import_dir()
-    if not os.path.exists(import_folder):
-        os.mkdir(import_folder)
+@singleton
+class ImportManager():
+    def init(self,wordsListFile, deckName, frontFormat,backFormat):
+        self.__frontFormat = frontFormat
+        self.__backFormat = backFormat
+        self.__words = Anki_common().getWordList(wordsListFile)
+        self.__deckName = deckName
+        self.__initWordsImported()
+        self.__initDownloadWords()
+        (self.__formatMap, self.__realFormatList) = getFormatInfo([frontFormat, backFormat])
 
-    deck_folder = Anki_common().import_deck_dir(deck)
-    words = []
-    addid = -1
-    maxid = 0
+    # 获取在该deck上已经以相同的格式导入的的单词
+    def __initWordsImported(self):
+        deck = self.__deckName
+        frontFormat = self.__frontFormat
+        backFormat = self.__backFormat
+        ####
+        import_folder = Anki_common().import_dir()
+        if not os.path.exists(import_folder):
+            os.mkdir(import_folder)
 
-    if not os.path.exists(deck_folder):
-        os.mkdir(deck_folder)
-    else:
-        for filename in os.listdir(deck_folder):
-            relist = re.findall(Anki_common().fformat_pattern(), filename)
-            if len(relist) == 0:
-                continue
-            id = int(relist[0])
-            if id > maxid:
-                maxid = id
+        deck_folder = Anki_common().import_deck_dir(deck)
+        words = []
+        addid = -1
+        maxid = 0
 
-            frontFile = Anki_common().import_fformat_file(deck, id)
-            backFile= Anki_common().import_bformat_file(deck, id)
-            wordslistFile = Anki_common().import_wordslist_file(deck, id)
-            if (not os.path.exists(backFile)) or (not os.path.exists(wordslistFile)):
-                continue
+        if not os.path.exists(deck_folder):
+            os.mkdir(deck_folder)
+        else:
+            for filename in os.listdir(deck_folder):
+                relist = re.findall(Anki_common().fformat_pattern(), filename)
+                if len(relist) == 0:
+                    continue
+                id = int(relist[0])
+                if id > maxid:
+                    maxid = id
 
-            file = open(frontFile, 'r')
-            str = file.read()
+                frontFile = Anki_common().import_fformat_file(deck, id)
+                backFile = Anki_common().import_bformat_file(deck, id)
+                wordslistFile = Anki_common().import_wordslist_file(deck, id)
+                if (not os.path.exists(backFile)) or (not os.path.exists(wordslistFile)):
+                    continue
+
+                file = open(frontFile, 'r')
+                str = file.read()
+                file.close()
+
+                if str != frontFormat:
+                    continue
+
+                file = open(backFile, 'r')
+                str = file.read()
+                file.close()
+
+                if str != backFormat:
+                    continue
+
+                words = Anki_common().getWordList(wordslistFile)
+                addid = id
+                break
+
+        if addid == -1:
+            addid = maxid + 1
+            file = open(Anki_common().import_fformat_file(deck, addid), 'w')
+            file.write(frontFormat)
             file.close()
 
-            if str != frontFormat:
-                continue
-
-            file = open(backFile, 'r')
-            str = file.read()
+            file = open(Anki_common().import_bformat_file(deck, addid), 'w')
+            file.write(backFormat)
             file.close()
+        ###
+        logging.debug(('Addid:%d, importedWords:%d' % (addid, len(words))))
+        self.__addid = addid
+        self.__ImportedWords = words
 
-            if str != backFormat:
-                continue
+    #获取已经下载的单词
+    def __initDownloadWords(self):
+        downloadWords = []
+        Download_path = Anki_common().download_dir()
+        if os.path.exists(Download_path):
+            for filename in os.listdir(Download_path):
+                if (os.path.isdir(Download_path + '\\' + filename) and filename in self.__words):
+                    if self.__doCheckWordInfo(filename):
+                        downloadWords.append(filename)
+        else:
+            os.mkdir(Download_path)
+        logging.debug(("%d words is already added." % len(downloadWords)))
+        self.__downloadWords = downloadWords
 
-            words = Anki_common().getWordList(wordslistFile)
-            addid = id
-            break
+    def getDownloadWords(self):
+        return list(set(self.__downloadWords) - set(self.__ImportedWords))
 
-    if addid == -1:
-        addid = maxid + 1
-        file = open(Anki_common().import_fformat_file(deck, addid), 'w')
-        file.write(frontFormat)
-        file.close()
+    def getImportWords(self):
+        return list(set(self.__words) - set(self.__ImportedWords) - set(self.__downloadWords))
 
-        file = open(Anki_common().import_bformat_file(deck, addid), 'w')
-        file.write(backFormat)
-        file.close()
-    return (addid, words)
+    # 查询该文件夹是否为有效的单词信息存储文件夹
+    def __doCheckWordInfo(self, word):
+        wordPath = Anki_common().word_path(word)
+        existsFiles = set()
+        if os.path.exists(wordPath):
+            for filename in os.listdir(wordPath):
+                existsFiles.add(filename)
 
+        notExistsFiles = EXISTFILES - existsFiles
+        if len(notExistsFiles) == 0:
+            return True
+        else:
+            return False
+
+    def startImport(self):
+        downloadWords = self.getDownloadWords()
+        words = self.getImportWords()
+
+        logging.debug(("%d words need download, %d words is already download." % (len(words), len(downloadWords))))
+        if len(words) == 0 and len(downloadWords) == 0:
+            showCompletionDialog(0)
+            return
+
+        threadManager().init(words, downloadWords)
+
+        totalWordsNum = len(words) + len(downloadWords)
+        mw.progress.start(totalWordsNum, parent=mw, immediate=True)
+
+        Count = 0
+        isFailure = False
+        while (True):
+            run = threadManager().CheckRunning()
+            ImportWords = wordsManager().getFinishedWords()
+
+            if (not run) and len(ImportWords) == 0:
+                logging.debug("No thread is running and no finished words.")
+                break
+
+            (failure, newWords) = self.ImportCards(ImportWords,Count)
+
+            if failure:
+                showFailureDialog()
+                isFailure = True
+                break
+            Count += len(newWords)
+            logging.debug(("This time import %d words." % len(newWords)))
+            if len(newWords) != 0:
+                file = open(Anki_common().import_wordslist_file(self.__deckName, self.__addid), 'a')
+                for newWord in newWords:
+                    file.write(newWord + '\n')
+                file.close()
+
+        mw.progress.finish()
+        mw.deckBrowser.refresh()
+        if not isFailure:
+            showCompletionDialog(Count)
+
+    def ImportCards(self, ImportWords,position):
+        if len(ImportWords) == 0:
+            return (False, [])
+        formatKeys = list(self.__formatMap.keys())
+
+        # Get the MediaImport deck id (auto-created if it doesn't exist)
+        did = mw.col.decks.id(self.__deckName)
+        m = mw.col.models.byName("Basic")
+
+        newWords = []
+        failure = False
+        i = position
+        for word in ImportWords:
+            note = notes.Note(mw.col, m)
+            note.model()['did'] = did
+            wordInfo = getWordInfo(word)
+            for fKey in formatKeys:
+                if fKey == 'Voicelis':
+                    voiceList = wordInfo['Voice']
+                    formatVoice = self.__formatMap[fKey]
+                    for voicePos in range(formatVoice):
+                        key = 'Voicelis_%d' % voicePos
+                        if voicePos < len(voiceList):
+                            f = open(Anki_common().voice_lis_path(word, voiceList[voicePos]), 'r')
+                            str = f.read()
+                            f.close()
+                            wordInfo[key] = str
+                        else:
+                            wordInfo[key] = ''
+                elif fKey == 'Voicepr':
+                    voiceList = wordInfo['Voice']
+                    formatVoice = self.__formatMap[fKey]
+                    for voicePos in range(formatVoice):
+                        key = 'Voicepr_%d' % voicePos
+                        if voicePos < len(voiceList):
+                            fname = mw.col.media.addFile(Anki_common().voice_pr_path(word, voiceList[voicePos]))
+                            str = u'[sound:%s]' % fname
+                            wordInfo[key] = str
+                        else:
+                            wordInfo[key] = ''
+                elif fKey == 'Pic':
+                    picList = wordInfo['Picture']
+                    formatPic = self.__formatMap[fKey]
+                    for picPos in range(formatPic):
+                        key = 'Pic_%d' % picPos
+                        if picPos < len(picList):
+                            fname = mw.col.media.addFile(Anki_common().picture_path(word, picList[picPos]))
+                            str = u'<img src="%s">' % fname
+                            wordInfo[key] = str
+                        else:
+                            wordInfo[key] = ''
+                elif fKey == 'en' or fKey == 'us':
+                    pr_path = Anki_common().word_pr_path(word, fKey)
+                    str = ''
+                    if os.path.exists(pr_path):
+                        fname = mw.col.media.addFile(pr_path)
+                        str = u'[sound:%s]' % fname
+                    wordInfo[fKey] = str
+                elif not (fKey in wordInfo.keys()):
+                    wordInfo[fKey] = ''
+
+            note['Front'] = self.__realFormatList[0] % wordInfo
+            note['Back'] = self.__realFormatList[1] % wordInfo
+
+            if not mw.col.addNote(note):
+                # No cards were generated - probably bad template. No point
+                # trying to import anymore.
+                failure = True
+                break
+            newWords.append(word)
+            i += 1
+            mw.progress.update(value=i)
+            logging.debug(("Word:%s imported." % word))
+        return (failure, newWords)
 
 def doAnkiImport():
     reload(sys)
@@ -136,163 +307,13 @@ def doAnkiImport():
     logging.basicConfig(format=log_format, filename=Anki_common().log_file(), filemode='a', level=logging.DEBUG)
 
     # Raise the main dialog for the add-on and retrieve its result when closed.
-    (wordListFile, deckName, frontFormat, backFormat, ok) = ImportSettingsDialog().getDialogResult()
+    (wordsListFile, deckName, frontFormat, backFormat, ok) = ImportSettingsDialog().getDialogResult()
     if not ok:
         return
 
-    frontFormat = Anki_common().clear_linefeeds(frontFormat)
-    backFormat = Anki_common().clear_linefeeds(backFormat)
-       
-    #check format info
-    if not (doCheckFormat(frontFormat) and doCheckFormat(backFormat)):
-        return
-    
-    words = Anki_common().getWordList(wordListFile)
+    ImportManager().init(wordsListFile, deckName, frontFormat, backFormat)
+    ImportManager().startImport()
 
-    #Download Words
-    downloadWords = []
-    Download_path = Anki_common().download_dir()
-    if os.path.exists(Download_path):
-        for filename in os.listdir(Download_path):
-            if (os.path.isdir(Download_path + '\\' + filename) and filename in words):
-                if doCheckWordInfo(filename):
-                    downloadWords.append(filename)
-    else:
-        os.mkdir(Download_path)
-
-    (addid, ImportedWords) = getWordsImported(deckName, frontFormat, backFormat)
-    logging.debug(('Addid:%d, importedWords:%d' % (addid, len(ImportedWords))))
-
-    downloadWords = list(set(downloadWords) - set(ImportedWords))
-    words = list(set(words) - set(ImportedWords) - set(downloadWords))
-    logging.debug(("%d words need download, %d words is already download." % (len(words), len(downloadWords))))
-    if len(words) == 0 and len(downloadWords) == 0:
-        showCompletionDialog(0)
-        return
-
-    threadManager(words, downloadWords)
-
-    (formatMap, realFormatList) = getFormatInfo([frontFormat,backFormat])
-
-    Count = 0
-    isFailure = False
-    while(True):
-        run = threadManager().CheckRunning()
-        ImportWords = wordsManager().getFinishedWords()
-
-        if (not run) and len(ImportWords) == 0:
-            logging.debug("No thread is running and no finished words.")
-            break
-
-        (failure, newWords) = ImportCards(deckName,ImportWords, formatMap, realFormatList)
-
-        if failure:
-            showFailureDialog()
-            isFailure = True
-            break
-        Count += len(newWords)
-        logging.debug(("This time import %d words." % len(newWords)))
-        if len(newWords) == 0:
-            time.sleep(60)
-        else:
-            file = open(Anki_common().import_wordslist_file(deckName, addid), 'a')
-            for newWord in newWords:
-                file.write(newWord + '\n')
-            file.close()
-
-    if not isFailure:
-        showCompletionDialog(Count)
-
-
-def ImportCards(deckName,ImportWords,formatMap,realFormatList):
-    if len(ImportWords) == 0:
-        return (False, [])
-    formatKeys = list(formatMap.keys())
-    
-    # Get the MediaImport deck id (auto-created if it doesn't exist)
-    did = mw.col.decks.id(deckName)
-    m = mw.col.models.byName("Basic")
-    mw.progress.start(max=len(ImportWords), parent=mw, immediate=True)
-    newWords = []
-    failure = False
-    for i, word in enumerate(ImportWords): 
-        note = notes.Note(mw.col, m)
-        note.model()['did'] = did
-        wordInfo = getWordInfo(word)
-        for fKey in formatKeys:
-            if fKey == 'Voicelis':
-                voiceList = wordInfo['Voice']
-                formatVoice= formatMap[fKey]
-                for voicePos in range(formatVoice):
-                    key = 'Voicelis_%d' % voicePos
-                    if voicePos < len(voiceList):
-                        f = open(Anki_common().voice_lis_path(word, voiceList[voicePos]), 'r')
-                        str = f.read()
-                        f.close()
-                        wordInfo[key] = str
-                    else:                        
-                        wordInfo[key] = ''
-            elif fKey == 'Voicepr':
-                voiceList = wordInfo['Voice']
-                formatVoice= formatMap[fKey]
-                for voicePos in range(formatVoice):
-                    key = 'Voicepr_%d' % voicePos
-                    if voicePos < len(voiceList):
-                        fname = mw.col.media.addFile(Anki_common().voice_pr_path(word, voiceList[voicePos]))
-                        str = u'[sound:%s]' % fname                        
-                        wordInfo[key] = str
-                    else:                        
-                        wordInfo[key] = ''
-            elif fKey == 'Pic':
-                picList = wordInfo['Picture']
-                formatPic= formatMap[fKey]
-                for picPos in range(formatPic):
-                    key = 'Pic_%d' % picPos
-                    if picPos < len(picList):
-                        fname = mw.col.media.addFile(Anki_common().picture_path(word, picList[picPos]))
-                        str = u'<img src="%s">' % fname
-                        wordInfo[key] = str
-                    else:                        
-                        wordInfo[key] = ''
-            elif fKey == 'en' or fKey == 'us':
-                pr_path = Anki_common().word_pr_path(word, fKey)
-                str = ''
-                if os.path.exists(pr_path):
-                    fname = mw.col.media.addFile()
-                    str = u'[sound:%s]' % fname
-                wordInfo[fKey] = str
-            elif not (fKey in wordInfo.keys()):
-                wordInfo[fKey] = ''
-                
-        note['Front'] = realFormatList[0] % wordInfo
-        note['Back'] = realFormatList[1] % wordInfo
-
-        if not mw.col.addNote(note):
-            # No cards were generated - probably bad template. No point
-            # trying to import anymore.
-            failure = True
-            break
-        newWords.append(word)
-        mw.progress.update(value=i)
-        logging.debug(("Word:%s import as a card %d." % (word,i)))
-    mw.progress.finish()
-    mw.deckBrowser.refresh()
-    return (failure, newWords)
-
-#查询该文件夹是否为有效的单词信息存储文件夹
-def doCheckWordInfo(word):
-    wordPath = Anki_common().word_path(word)
-    existsFiles = set()
-    if os.path.exists(wordPath):
-        for filename in os.listdir(wordPath):
-            existsFiles.add(filename)
-    
-    notExistsFiles = EXISTFILES - existsFiles
-    if len(notExistsFiles) == 0:
-        return True
-    else:
-        return False
-    
 #获取单词的文件信息    
 #存储格式为：
 #txt: name-->content
@@ -401,7 +422,6 @@ def getFormatInfo(wordList):
 
     return (resultMap, resultFormatList)
 
-
 class ImportSettingsDialog(QDialog):
     def __init__(self):
         QDialog.__init__(self, mw)
@@ -421,8 +441,11 @@ class ImportSettingsDialog(QDialog):
     def getDialogResult(self):
         if self.result() == QDialog.Rejected:
             return (None, None, None, None, False)
+
+        front = Anki_common().clear_linefeeds(self.FrontEdit)
+        back = Anki_common().clear_linefeeds(self.BackEdit)
             
-        return (self.WordlistFile, self.DecksName, self.FrontEdit, self.BackEdit, True)
+        return (self.WordlistFile, self.DecksName, front, back, True)
 
     def onBrowse(self):
         """Show the directory selection dialog."""
@@ -472,15 +495,13 @@ class ImportSettingsDialog(QDialog):
         QDialog.accept(self)
 
 def showCompletionDialog(newCount):
-    QMessageBox.about(mw, "Media Import Complete",
+    if newCount == 0:
+        QMessageBox.about(mw, "Media Import Complete","No words need to importing...")
+    else:
+        QMessageBox.about(mw, "Media Import Complete",
 """
 <p>
-Media import is complete and %s new notes were created. 
-All generated cards are placed in the <b>MediaImport</b> deck.
-<br><br>
-Please refer to the introductory videos for instructions on 
-<a href="https://youtube.com/watch?v=DnbKwHEQ1mA">flipping card content</a> or 
-<a href="http://youtube.com/watch?v=F1j1Zx0mXME">modifying the appearance of cards.</a>
+Media import is complete and %s new notes were created.
 </p>""" % newCount)
 
 def showFailureDialog():

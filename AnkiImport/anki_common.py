@@ -81,8 +81,9 @@ class Anki_common(object):
         str = self.word_path(word) + '\\Pic_%d.jpg'
         return str % pos
 
-    def word_pr_path(self,word):
-        return self.word_path(word) + '\\%s.mp3'
+    def word_pr_path(self,word,mp3):
+        str = self.word_path(word) + '\\%s.mp3'
+        return str % mp3
 
     def word_mean(self,word):
         return self.word_path(word) + '\\mean.txt'

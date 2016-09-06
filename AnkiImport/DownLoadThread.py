@@ -43,8 +43,10 @@ class downloadThread (threading.Thread):
 
 @singleton
 class wordsManager():
-    def __init__(self, wordslist, finishedlist):
+    def __init__(self):
         self.mutex = threading.Lock()
+
+    def init(self,wordslist, finishedlist):
         self.wordslist = wordslist
         self.downloadMap = {}
         self.finishedlist = finishedlist
@@ -122,8 +124,8 @@ class wordsManager():
 
 @singleton
 class threadManager():
-    def __init__(self, wordslist, finishedlist):
-        wordsManager(wordslist, finishedlist)
+    def init(self, wordslist, finishedlist):
+        wordsManager().init(wordslist, finishedlist)
         self.threads = {}
         for threadID in range(1, THREAD_NUM_MAX+1):
             thread = downloadThread(threadID)

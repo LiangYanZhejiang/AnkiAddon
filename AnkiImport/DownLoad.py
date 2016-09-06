@@ -25,7 +25,7 @@ def import_words(words):
 
     # 去除重复单词
     words = list(set(words) - existsWords)
-    threadManager(list(set(words)),list(existsWords))
+    threadManager().init(list(set(words)),list(existsWords))
 
 
 def main():
