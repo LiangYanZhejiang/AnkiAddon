@@ -67,6 +67,9 @@ PATTERN_STR_D = '%%(%s)s'
 
 PATTERN_LIST = [LIS_PATTERN, VOICE_PATTERN, PIC_PATTERN]
 
+FOLDER_CANNOT_INCLUDE = ['/',':','*','?','"','<','>','|','\n']
+FOLDER_CANNOT_BE = {'CON','PRN','AUX','CLOCK$','NUL','COM1','COM2','COM3','COM4','COM5','COM6','COM7','COM8','COM9,','LPT1'}
+
 VOICE_MAX = 10
 
 @singleton
@@ -159,10 +162,11 @@ class ImportManager():
         self.__downloadWords = downloadWords
 
     def getDownloadWords(self):
-        return list(set(self.__downloadWords) - set(self.__ImportedWords))
+        return list(set(self.__downloadWords) - set(self.__ImportedWords) - FOLDER_CANNOT_BE)
 
     def getImportWords(self):
-        return list(set(self.__words) - set(self.__ImportedWords) - set(self.__downloadWords))
+        return list(set(self.__words) - set(self.__ImportedWords) - set(self.__downloadWords) - FOLDER_CANNOT_BE)
+
 
     # 查询该文件夹是否为有效的单词信息存储文件夹
     def __doCheckWordInfo(self, word):
@@ -281,9 +285,6 @@ class ImportManager():
                     wordInfo[fKey] = str
                 elif not (fKey in wordInfo.keys()):
                     wordInfo[fKey] = ''
-
-            content = self.__realFormatList[0] % wordInfo
-
 
             note['Front'] = self.getCardContent(self.__realFormatList[0],wordInfo)
             note['Back'] = self.getCardContent(self.__realFormatList[1],wordInfo)
@@ -493,6 +494,17 @@ class ImportSettingsDialog(QDialog):
         if self.DecksName == '':
             self.form.DecksName.setStyleSheet("border: 1px solid red")
             return
+        deckName = self.DecksName.upper()
+        for char in FOLDER_CANNOT_INCLUDE:
+            if char in deckName:
+                showErrorDialog(("DeckName canot include %s ." % char))
+                self.form.DecksName.setStyleSheet("border: 1px solid red")
+                return
+        for name in FOLDER_CANNOT_BE:
+            if name == deckName:
+                showErrorDialog(("DeckName canot be %s ." % self.DecksName))
+                self.form.DecksName.setStyleSheet("border: 1px solid red")
+                return
         if self.FrontEdit == '':
             self.form.FrontEdit.setStyleSheet("border: 1px solid red")
             return
