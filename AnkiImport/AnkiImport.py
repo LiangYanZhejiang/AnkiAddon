@@ -282,8 +282,11 @@ class ImportManager():
                 elif not (fKey in wordInfo.keys()):
                     wordInfo[fKey] = ''
 
-            note['Front'] = self.__realFormatList[0] % wordInfo
-            note['Back'] = self.__realFormatList[1] % wordInfo
+            content = self.__realFormatList[0] % wordInfo
+
+
+            note['Front'] = self.getCardContent(self.__realFormatList[0],wordInfo)
+            note['Back'] = self.getCardContent(self.__realFormatList[1],wordInfo)
 
             if not mw.col.addNote(note):
                 # No cards were generated - probably bad template. No point
@@ -295,6 +298,18 @@ class ImportManager():
             mw.progress.update(value=i)
             logging.debug(("Word:%s imported." % word))
         return (failure, newWords)
+
+    def getCardContent(self, formatlist, wordInfo):
+        content = formatlist % wordInfo
+        contentList = content.split('\n')
+        result = ''
+        for info in contentList:
+            if result == '':
+                result = info
+            else:
+                result = '%s<div>%s</div>' % (result, info)
+        return result
+
 
 def doAnkiImport():
     reload(sys)
